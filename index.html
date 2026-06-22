@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Finance Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    html, body { height: 100%; font-family: sans-serif; background: #f5f5f5; }
+    body { display: flex; flex-direction: column; padding: 16px; overflow: hidden; }
+    h1 { font-size: 1.2rem; margin-bottom: 12px; color: #333; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+    #toggleAmounts { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 0; line-height: 1; }
+    .charts { display: flex; flex-wrap: nowrap; gap: 16px; flex: 1; overflow: hidden; }
+    .card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.1); flex: 1; min-width: 0; overflow-y: auto; }
+    @media (max-width: 768px) {
+      html, body { height: auto; overflow: auto; }
+      body { overflow: auto; }
+      .charts { flex-wrap: wrap; overflow: visible; }
+      .card { flex: none; width: 100%; min-width: 0; height: auto; min-height: 400px; }
+    }
+    h2 { font-size: 1rem; margin-bottom: 16px; color: #555; }
+
+    /* Monthly chart card — full width */
+    .card.wide { max-width: 100%; width: 100%; }
+
+    @media (max-width: 600px) {
+      body { padding: 16px; }
+      .card { min-width: 100%; max-width: 100%; }
+      .card.wide { min-width: 100%; }
+    }
+
+    /* Month navigator */
+    .month-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 16px; }
+    .month-nav button { background: none; border: 1px solid #ddd; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 1rem; color: #555; display: flex; align-items: center; justify-content: center; }
+    .month-nav button:disabled { opacity: 0.3; cursor: default; }
+    .month-nav span { font-size: 1rem; font-weight: 600; color: #333; min-width: 120px; text-align: center; }
+
+    /* Income / Expense toggle */
+    .type-toggle { display: flex; gap: 0; margin-bottom: 16px; width: fit-content; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; margin-left: auto; margin-right: auto; }
+    .type-toggle button { padding: 6px 20px; border: none; background: #fff; cursor: pointer; font-size: .85rem; color: #555; }
+    .type-toggle button.active { background: #6366f1; color: #fff; }
+
+    .cat-list { list-style: none; margin-top: 16px; height: 200px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; padding: 0 8px; }
+    .cat-list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: .9rem; }
+    .cat-list .pct { font-weight: 700; min-width: 44px; }
+    .cat-list .name { flex: 1; color: #444; }
+    .cat-list .amt { color: #333; white-space: nowrap; }
+
+    .cc-list { list-style: none; }
+    .cc-item { padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+    .cc-item:last-child { border-bottom: none; }
+    .cc-name { font-size: .85rem; color: #888; margin-bottom: 4px; }
+    .cc-balance { font-size: 1.4rem; font-weight: 700; color: #333; margin-bottom: 8px; }
+    .cc-bar-wrap { background: #eee; border-radius: 4px; height: 8px; margin-bottom: 4px; }
+    .cc-bar { height: 8px; border-radius: 4px; background: rgba(244,63,94,.7); }
+    .cc-meta { display: flex; justify-content: space-between; }
+    .cc-meta span { font-size: .75rem; font-style: italic; color: #999; }
+    .cc-days { font-size: .75rem; color: #aaa; margin-top: 6px; }
+    .cc-txs { display: none; margin-top: 10px; border-top: 1px solid #f0f0f0; padding-top: 8px; }
+    .cc-txs.open { display: block; }
+    .cc-tx-row { display: flex; justify-content: space-between; font-size: .82rem; padding: 4px 0; border-bottom: 1px solid #f8f8f8; color: #555; }
+    .cc-item { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Finance Tracker <button id="toggleAmounts" title="Toggle amounts">👁️</button></h1>
+  <div class="charts">
+    <div class="card">
+      <h2>Account Balances</h2>
+      <canvas id="pieChart"></canvas>
+      <ul id="acctList" class="cat-list" style="margin-top:16px"></ul>
+      <button id="acctBack" style="display:none;margin-top:12px;padding:6px 16px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;font-size:.85rem;">‹ Back</button>
+    </div>
+    <div class="card">
+      <h2>Credit Card Utilization</h2>
+      <ul id="ccList" class="cc-list"></ul>
+    </div>
+
+    <!-- Installments -->
+    <div class="card" id="installmentsSection">
+      <h2>Installments</h2>
+      <div style="max-width:300px;margin:0 auto"><canvas id="instChart"></canvas></div>
+      <div class="month-nav" id="instNav" style="margin:16px 0 8px">
+        <button id="instPrev">&#8592;</button>
+        <span id="instLabel" style="font-size:1rem;font-weight:600;min-width:140px;text-align:center"></span>
+        <button id="instNext">&#8594;</button>
+      </div>
+      <div style="text-align:center;font-size:.85rem;color:#888;margin-bottom:8px">
+        Monthly total: <span id="instMonthTotal" class="amt"></span>
+      </div>
+      <ul id="instList" class="cat-list" style="height:200px"></ul>
+    </div>
+    <div class="card" id="monthlySection">
+      <h2>Transactions by Month</h2>
+      <div class="month-nav">
+        <button id="btnPrev" onclick="changeMonth(-1)">&#8592;</button>
+        <span id="monthLabel">—</span>
+        <button id="btnNext" onclick="changeMonth(1)">&#8594;</button>
+      </div>
+      <div class="type-toggle">
+        <button id="btnExpense" class="active" onclick="selectType('Expense')">Expense</button>
+        <button id="btnIncome" onclick="selectType('Income')">Income</button>
+      </div>
+      <div class="monthly-pie-wrap">
+        <canvas id="monthlyPie"></canvas>
+      </div>
+      <button id="listBack" style="display:none;margin-bottom:4px;padding:6px 16px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;font-size:.85rem;">‹ Back</button>
+      <div id="listTotal" style="font-size:.85rem;font-weight:600;text-align:right;margin-bottom:4px;display:none">Total: <span class="amt" id="listTotalAmt"></span></div>
+      <ul id="monthlyList" class="cat-list"></ul>
+    </div>
+  </div>
+
+  <script>
+    let instData = [], instIdx = 0, instChart = null;
+
+    google.script.run
+      .withSuccessHandler(months => {
+        instData = months;
+        instIdx = 0;
+        renderInstMonth();
+      })
+      .withFailureHandler(err => console.error(err))
+      .getInstallments();
+
+    document.getElementById('instPrev').addEventListener('click', () => { if (instIdx > 0) { instIdx--; renderInstMonth(); } });
+    document.getElementById('instNext').addEventListener('click', () => { if (instIdx < instData.length - 1) { instIdx++; renderInstMonth(); } });
+
+    function renderInstMonth() {
+      const m = instData[instIdx];
+      if (!m) return;
+      document.getElementById('instLabel').textContent = m.label;
+      document.getElementById('instPrev').disabled = instIdx === 0;
+      document.getElementById('instNext').disabled = instIdx === instData.length - 1;
+      document.getElementById('instMonthTotal').textContent = '₱' + m.total.toLocaleString('en-PH', {minimumFractionDigits:2});
+
+      // Donut chart
+      if (instChart) instChart.destroy();
+      instChart = new Chart(document.getElementById('instChart'), {
+        type: 'doughnut',
+        data: {
+          labels: m.active.map(a => a.name),
+          datasets: [{ data: m.active.map(a => a.termPayment), borderWidth: 1 }]
+        },
+        options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: ctx => ' ₱' + ctx.parsed.toLocaleString('en-PH', {minimumFractionDigits:2}) } } } }
+      });
+
+      // List
+      const list = document.getElementById('instList');
+      list.innerHTML = m.active.length ? m.active.map(a => `
+        <li>
+          <span class="name">${a.name} <span style="color:#aaa;font-size:.8rem">(${a.account})</span></span>
+          <span style="color:#888;font-size:.8rem;margin-right:8px">${a.iteration}/${a.terms}</span>
+          <span class="amt">₱${a.termPayment.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
+        </li>`).join('') : '<li><span class="name" style="color:#bbb">No active installments</span></li>';
+    }
+    let subcatMap = {};
+    let months = [];
+    let monthIdx = 0;
+    let activeType = 'Expense';
+    let chartDataResult = null;
+    let txDataResult = null;
+    let monthlyChart = null;
+
+    function onAllLoaded() {
+      if (!chartDataResult || !txDataResult) return;
+      renderPie(chartDataResult.nonCC);
+      renderBar(chartDataResult.cc);
+      // Load images async after charts render
+      // Image loading disabled for perf testing
+      // google.script.run
+      //   .withSuccessHandler(urls => {
+      //     urls.forEach((url, i) => {
+      //       if (!url) return;
+      //       const imgs = document.querySelectorAll('.cc-img');
+      //       if (imgs[i]) imgs[i].src = url;
+      //     });
+      //   })
+      //   .getCCImages(chartDataResult.cc.images);
+      txData = txDataResult.months;
+      subcatMap = txDataResult.subcatMap;
+      months = Object.keys(txData).sort((a, b) => new Date('1 ' + a) - new Date('1 ' + b));
+      monthIdx = months.length - 1;
+      updateMonthNav();
+      renderMonthlyPie();
+    }
+
+    google.script.run
+      .withSuccessHandler(d => { chartDataResult = d; onAllLoaded(); })
+      .withFailureHandler(err => alert(err.message))
+      .getChartData();
+
+    google.script.run
+      .withSuccessHandler(data => { txDataResult = data; onAllLoaded(); })
+      .withFailureHandler(err => alert(err.message))
+      .getTransactionsByMonth();
+
+    function updateMonthNav() {
+      document.getElementById('monthLabel').textContent = months[monthIdx];
+      document.getElementById('btnPrev').disabled = monthIdx === 0;
+      document.getElementById('btnNext').disabled = monthIdx === months.length - 1;
+    }
+
+    function changeMonth(dir) {
+      monthIdx = Math.max(0, Math.min(months.length - 1, monthIdx + dir));
+      updateMonthNav();
+      renderMonthlyPie();
+    }
+
+    function selectType(type) {
+      activeType = type;
+      document.getElementById('btnExpense').classList.toggle('active', type === 'Expense');
+      document.getElementById('btnIncome').classList.toggle('active', type === 'Income');
+      renderMonthlyPie();
+    }
+
+    let currentSorted = [];
+    let currentColors = [];
+    let currentTotal = 0;
+    let currentCatData = {};
+
+    function renderMonthlyPie() {
+      const month = months[monthIdx];
+      if (!month || !txData[month]) return;
+      currentCatData = txData[month][activeType] || {};
+      currentTotal = Object.values(currentCatData).reduce((a, b) => a + b.total, 0);
+      currentSorted = Object.entries(currentCatData).sort((a, b) => b[1].total - a[1].total);
+
+      if (monthlyChart) monthlyChart.destroy();
+      monthlyChart = new Chart(document.getElementById('monthlyPie'), {
+        type: 'doughnut',
+        data: { labels: currentSorted.map(e => e[0]), datasets: [{ data: currentSorted.map(e => +e[1].total.toFixed(2)), borderWidth: 1 }] },
+        options: PIE_OPTIONS
+      });
+
+      currentColors = monthlyChart.data.datasets[0].backgroundColor;
+      showCategoryList(currentSorted, currentColors, currentTotal, currentCatData);
+    }
+
+    function setListTotal(amount) {
+      const el = document.getElementById('listTotal');
+      const amt = document.getElementById('listTotalAmt');
+      el.style.display = amount !== null ? '' : 'none';
+      if (amount !== null) amt.textContent = '₱' + amount.toLocaleString('en-PH', {minimumFractionDigits:2});
+    }
+
+    function backToCategoryList() {
+      showCategoryList(currentSorted, currentColors, currentTotal, currentCatData);
+    }
+
+    function scrollToList() {}
+
+    function showCategoryList(sorted, colors, total, catData) {
+      const list = document.getElementById('monthlyList');
+      list.innerHTML = '';
+      document.getElementById('listBack').style.display = 'none';
+      setListTotal(total);
+
+      sorted.forEach(([cat, catObj], i) => {
+        const amt = catObj.total;
+        const pct = total ? (amt / total * 100).toFixed(1) : 0;
+        const hasSubcats = Object.keys(catObj.subcats).length > 0;
+        const li = document.createElement('li');
+        li.style.cursor = 'pointer';
+        li.innerHTML = `
+          <span class="pct" style="color:${colors[i]}">${pct}%</span>
+          <span class="name">${cat}${hasSubcats ? ' ›' : ''}</span>
+          <span class="amt">₱${amt.toLocaleString('en-PH', {minimumFractionDigits:2})}</span>`;
+        li.onclick = () => {
+          if (hasSubcats) { showSubcatList(cat, catObj, colors[i]); scrollToList(); }
+          else { showTxList(cat, catObj.txs, colors[i]); scrollToList(); }
+        };
+        list.appendChild(li);
+      });
+    }
+
+    function showSubcatList(catName, catObj, color) {
+      const list = document.getElementById('monthlyList');
+      list.innerHTML = '';
+      const back = document.getElementById('listBack');
+      back.style.display = 'inline-block';
+      back.onclick = backToCategoryList;
+      setListTotal(catObj.total);
+
+      const total = catObj.total;
+      const sorted = Object.entries(catObj.subcats).sort((a, b) => b[1].total - a[1].total);
+
+      // Also show direct txs on category if any
+      if (catObj.txs.length) {
+        sorted.push([`${catName} (direct)`, { total: catObj.txs.reduce((a,t) => a+t.amount,0), txs: catObj.txs }]);
+      }
+
+      sorted.forEach(([sub, subObj]) => {
+        const pct = total ? (subObj.total / total * 100).toFixed(1) : 0;
+        const li = document.createElement('li');
+        li.style.cursor = 'pointer';
+        li.innerHTML = `
+          <span class="pct" style="color:${color}">${pct}%</span>
+          <span class="name">${sub} ›</span>
+          <span class="amt">₱${subObj.total.toLocaleString('en-PH', {minimumFractionDigits:2})}</span>`;
+        li.onclick = () => { showTxList(sub, subObj.txs, color, () => showSubcatList(catName, catObj, color)); scrollToList(); };
+        list.appendChild(li);
+      });
+    }
+
+    function showTxList(title, txs, color, backFn) {
+      const list = document.getElementById('monthlyList');
+      list.innerHTML = '';
+      const back = document.getElementById('listBack');
+      back.style.display = 'inline-block';
+      back.onclick = backFn || backToCategoryList;
+      setListTotal(txs.reduce((a, t) => a + t.amount, 0));
+
+      const header = document.createElement('li');
+      header.innerHTML = `<span class="name" style="font-weight:600;color:${color}">${title}</span>`;
+      list.appendChild(header);
+
+      txs.forEach(tx => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="name" style="color:#666;font-size:.85rem">${tx.date} · ${tx.account}</span>
+          <span class="amt">₱${tx.amount.toLocaleString('en-PH', {minimumFractionDigits:2})}</span>`;
+        list.appendChild(li);
+      });
+    }
+
+    const PIE_OPTIONS = {
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' ₱' + ctx.parsed.toLocaleString('en-PH', { minimumFractionDigits: 2 })
+          }
+        }
+      }
+    };
+
+    let pieChart = null;
+
+    function renderPie(nonCC) {
+      if (pieChart) pieChart.destroy();
+      pieChart = new Chart(document.getElementById('pieChart'), {
+        type: 'doughnut',
+        data: { labels: nonCC.labels, datasets: [{ data: nonCC.data, borderWidth: 1 }] },
+        options: PIE_OPTIONS
+      });
+
+      const colors = pieChart.data.datasets[0].backgroundColor;
+      const total = nonCC.data.reduce((a, b) => a + b, 0);
+      const list = document.getElementById('acctList');
+      list.innerHTML = '';
+      document.getElementById('acctBack').style.display = 'none';
+
+      const totalEl = document.createElement('li');
+      totalEl.style.cssText = 'font-weight:600;border-bottom:2px solid #eee;margin-bottom:4px';
+      totalEl.innerHTML = `<span class="name">Total</span><span class="amt">₱${total.toLocaleString('en-PH', {minimumFractionDigits:2})}</span>`;
+      list.appendChild(totalEl);
+
+      nonCC.labels.forEach((name, i) => {
+        const bal = nonCC.data[i];
+        const pct = total ? (bal / total * 100).toFixed(1) : 0;
+        const li = document.createElement('li');
+        li.style.cursor = 'pointer';
+        li.innerHTML = `
+          <span class="pct" style="color:${colors[i]}">${pct}%</span>
+          <span class="name">${name} ›</span>
+          <span class="amt">₱${bal.toLocaleString('en-PH', {minimumFractionDigits:2})}</span>`;
+        li.onclick = () => showAcctTxs(name, nonCC.accounts[i]);
+        list.appendChild(li);
+      });
+    }
+
+    function showAcctTxs(name, txs) {
+      const list = document.getElementById('acctList');
+      list.innerHTML = '';
+      const back = document.getElementById('acctBack');
+      back.style.display = 'inline-block';
+      back.onclick = () => renderPie(chartDataResult.nonCC);
+
+      const header = document.createElement('li');
+      header.innerHTML = `<span class="name" style="font-weight:600">${name}</span>`;
+      list.appendChild(header);
+
+      if (!txs.length) {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="name" style="color:#bbb;font-size:.85rem">No transactions</span>`;
+        list.appendChild(li);
+        return;
+      }
+
+      txs.forEach(tx => {
+        const isExpense = tx.type === 'Expense' || (tx.type === 'Transfer' && !tx.incoming);
+        const sign = isExpense ? '-' : '+';
+        const color = isExpense ? 'rgba(244,63,94,.8)' : 'rgba(34,197,94,.8)';
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="name" style="color:#666;font-size:.85rem">${tx.date} · ${tx.category || tx.type}</span>
+          <span class="amt" style="color:${color}">${sign}₱${tx.amount.toLocaleString('en-PH', {minimumFractionDigits:2})}</span>`;
+        list.appendChild(li);
+      });
+    }
+
+    function renderBar(cc) {
+      const list = document.getElementById('ccList');
+      cc.labels.forEach((name, i) => {
+        const balance = cc.balances[i];
+        const limit = cc.limits[i];
+        const pct = limit ? (balance / limit * 100).toFixed(1) : 0;
+        const avail = limit - balance;
+        const img = cc.images[i] ? `<img class="cc-img" src="${cc.images[i]}" style="width:80px;height:48px;object-fit:contain;border-radius:4px;margin-bottom:6px;display:block;">` : '';
+        const days = (cc.statementDays[i] || cc.dueDays[i]) ?
+          `<div class="cc-days">Statement day: ${cc.statementDays[i]} &nbsp;·&nbsp; Due day: ${cc.dueDays[i]}</div>` : '';
+
+        const li = document.createElement('li');
+        li.className = 'cc-item';
+        li.innerHTML = `
+          <div class="cc-name">${name}</div>
+          ${img}
+          <div class="cc-balance">₱${balance.toLocaleString('en-PH', {minimumFractionDigits:2})}</div>
+          <div class="cc-bar-wrap"><div class="cc-bar" style="width:${Math.min(pct,100)}%"></div></div>
+          <div class="cc-meta">
+            <span>${pct}% used</span>
+            <span>₱${avail.toLocaleString('en-PH', {minimumFractionDigits:2})} limit left</span>
+          </div>
+          ${days}
+          <div class="cc-txs" id="cc-detail-${i}">
+            <div class="type-toggle" style="margin:10px auto 8px">
+              <button id="cc-bystatement-${i}" class="active">By Statement</button>
+              <button id="cc-byall-${i}">All Transactions</button>
+            </div>
+            <div id="cc-statement-view-${i}">
+              <div class="month-nav" style="margin:4px 0">
+                <button id="cc-prev-${i}">&#8592;</button>
+                <span id="cc-label-${i}" style="font-size:.8rem;color:#aaa;min-width:160px;text-align:center"></span>
+                <button id="cc-next-${i}">&#8594;</button>
+              </div>
+            </div>
+            <div id="cc-txs-${i}" class="cat-list" style="height:160px"></div>
+          </div>`;
+
+        li.onclick = () => {
+          const detail = document.getElementById(`cc-detail-${i}`);
+          const opening = !detail.classList.contains('open');
+          detail.classList.toggle('open');
+          if (opening) {
+            if (ccCycleState[i] == null) ccCycleState[i] = 0;
+            ccViewState[i] = 'statement';
+            renderCCView(i);
+          }
+        };
+
+        list.appendChild(li);
+
+        document.getElementById(`cc-prev-${i}`).addEventListener('click', e => { e.stopPropagation(); changeCycle(i, 1); });
+        document.getElementById(`cc-next-${i}`).addEventListener('click', e => { e.stopPropagation(); changeCycle(i, -1); });
+        document.getElementById(`cc-bystatement-${i}`).addEventListener('click', e => { e.stopPropagation(); setCCView(i, 'statement'); });
+        document.getElementById(`cc-byall-${i}`).addEventListener('click', e => { e.stopPropagation(); setCCView(i, 'all'); });
+      });
+    }
+
+    const ccCycleState = {};
+    const ccViewState = {};
+
+    function setCCView(cardIdx, view) {
+      ccViewState[cardIdx] = view;
+      document.getElementById(`cc-bystatement-${cardIdx}`).classList.toggle('active', view === 'statement');
+      document.getElementById(`cc-byall-${cardIdx}`).classList.toggle('active', view === 'all');
+      document.getElementById(`cc-statement-view-${cardIdx}`).style.display = view === 'statement' ? '' : 'none';
+      renderCCView(cardIdx);
+    }
+
+    function renderCCView(cardIdx) {
+      const view = ccViewState[cardIdx] || 'statement';
+      if (view === 'statement') renderCycleTxs(cardIdx);
+      else renderAllTxs(cardIdx);
+    }
+
+    function changeCycle(cardIdx, dir) {
+      const cycles = chartDataResult.cc.cycles[cardIdx];
+      const current = ccCycleState[cardIdx] != null ? ccCycleState[cardIdx] : 0;
+      ccCycleState[cardIdx] = Math.max(0, Math.min(cycles.length - 1, current + dir));
+      renderCycleTxs(cardIdx);
+    }
+
+    function renderCycleTxs(cardIdx) {
+      const cycles = chartDataResult.cc.cycles[cardIdx];
+      const idx = ccCycleState[cardIdx] != null ? ccCycleState[cardIdx] : 0;
+      const cycle = cycles[idx];
+      if (!cycle) return;
+      document.getElementById(`cc-label-${cardIdx}`).textContent = cycle.label;
+      document.getElementById(`cc-prev-${cardIdx}`).disabled = idx >= cycles.length - 1;
+      document.getElementById(`cc-next-${cardIdx}`).disabled = idx <= 0;
+      renderTxList(cardIdx, cycle.txs);
+    }
+
+    function renderAllTxs(cardIdx) {
+      const txs = chartDataResult.cc.allTxs[cardIdx] || [];
+      renderTxList(cardIdx, txs);
+    }
+
+    function renderTxList(cardIdx, txs) {
+      const txsEl = document.getElementById(`cc-txs-${cardIdx}`);
+      txsEl.innerHTML = txs.length ? txs.map(tx => {
+        const sub = tx.subcategory ? ` · ${tx.subcategory}` : '';
+        const note = tx.note ? `<span style="color:#bbb"> — ${tx.note}</span>` : '';
+        return `<div class="cc-tx-row">
+          <div><div style="font-size:.82rem">${tx.date} · ${tx.category}${sub}${note}</div></div>
+          <div>₱${tx.amount.toLocaleString('en-PH',{minimumFractionDigits:2})}</div>
+        </div>`;
+      }).join('') : '<div style="font-size:.8rem;color:#bbb;padding:4px 0">No transactions</div>';
+    }
+    document.getElementById('toggleAmounts').addEventListener('click', () => {
+      const hidden = document.body.classList.toggle('hide-amounts');
+      document.getElementById('toggleAmounts').textContent = hidden ? '🙈' : '👁️';
+      document.querySelectorAll('.amt, .cc-balance').forEach(el => {
+        if (hidden) {
+          el.dataset.original = el.innerHTML;
+          el.innerHTML = el.innerHTML.replace(/[₱\d,\.]+/g, '****');
+        } else {
+          if (el.dataset.original) el.innerHTML = el.dataset.original;
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Finance Control Center</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f5f5f5; padding: 24px; }
+    h1 { font-size: 1.3rem; color: #333; margin-bottom: 24px; }
+    .cards { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+    .card { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.1); flex: 1; min-width: 300px; max-width: 480px; }
+    h2 { font-size: 1rem; color: #555; margin-bottom: 16px; }
+    .field { margin-bottom: 14px; display: flex; flex-direction: column; gap: 4px; }
+    label { font-size: .8rem; color: #888; }
+    input, select { padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: .95rem; width: 100%; }
+    button[type=submit] { margin-top: 8px; width: 100%; padding: 10px; background: #4f8ef7; color: #fff; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
+    button[type=submit]:disabled { background: #aaa; cursor: not-allowed; }
+    .msg { margin-top: 12px; font-size: .85rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Control Center</h1>
+  <div class="cards">
+
+  <div class="card">
+    <h2>Adjust Balance</h2>
+    <form id="adjForm">
+      <div class="field">
+        <label>Account</label>
+        <select id="adjAccount" required><option value="">Loading...</option></select>
+      </div>
+      <div class="field">
+        <label>New Balance</label>
+        <input type="number" id="adjBal" required step="0.01">
+      </div>
+      <button type="submit" id="adjSubmit">Adjust</button>
+      <div class="msg" id="adjMsg"></div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Add Installment</h2>
+    <form id="instForm">
+      <div class="field">
+        <label>Installment Name</label>
+        <input type="text" id="instName" required placeholder="e.g. iPhone 16 Pro">
+      </div>
+      <div class="field">
+        <label>Account</label>
+        <select id="instAccount" required><option value="">Loading...</option></select>
+      </div>
+      <div class="field">
+        <label>Total Amount (PHP)</label>
+        <input type="number" id="instTotal" required min="0" step="0.01">
+      </div>
+      <div class="field">
+        <label>Terms (months)</label>
+        <input type="number" id="instTerms" required min="1" step="1">
+      </div>
+      <div class="field">
+        <label>Start Date</label>
+        <input type="date" id="instStart" required>
+      </div>
+      <button type="submit" id="instSubmit">Add Installment</button>
+      <div class="msg" id="instMsg"></div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Add Account</h2>
+    <form id="acctForm">
+      <div class="field">
+        <label>Account Name</label>
+        <input type="text" id="acctName" required placeholder="e.g. BPI Savings">
+      </div>
+      <div class="field">
+        <label>Account Category</label>
+        <select id="acctCategory" required><option value="">Loading...</option></select>
+      </div>
+      <div class="field">
+        <label>Initial Balance</label>
+        <input type="number" id="acctInitBal" required step="0.01" placeholder="0">
+      </div>
+      <div class="field">
+        <label>Currency</label>
+        <select id="acctCurrency" required><option value="">Loading...</option></select>
+      </div>
+      <div class="field">
+        <label>Metadata (optional)</label>
+        <input type="text" id="acctMeta" placeholder="e.g. last 4 digits">
+      </div>
+      <div id="ccFields" style="display:none">
+        <div class="field">
+          <label>Credit Limit</label>
+          <input type="number" id="acctLimit" step="0.01">
+        </div>
+        <div class="field">
+          <label>Card Image (optional)</label>
+          <input type="file" id="acctImage" accept="image/*">
+        </div>
+        <div class="field">
+          <label>Statement Day</label>
+          <input type="number" id="acctStmtDay" min="1" max="31">
+        </div>
+        <div class="field">
+          <label>Due Day</label>
+          <input type="number" id="acctDueDay" min="1" max="31">
+        </div>
+      </div>
+      <button type="submit" id="acctSubmit">Add Account</button>
+      <div class="msg" id="acctMsg"></div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>New Category</h2>
+    <form id="catForm">
+      <div class="field">
+        <label>Type</label>
+        <select id="catType" required>
+          <option value="Expense">Expense</option>
+          <option value="Income">Income</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Category Name</label>
+        <input type="text" id="catName" required placeholder="e.g. Food">
+      </div>
+      <div class="field">
+        <label>Subcategory (optional)</label>
+        <input type="text" id="catSub" placeholder="e.g. Groceries">
+      </div>
+      <button type="submit" id="catSubmit">Add Category</button>
+      <div class="msg" id="catMsg"></div>
+    </form>
+  </div>
+
+  </div><!-- /cards -->
+  <script>
+    // Populate dropdowns
+    google.script.run.withSuccessHandler(data => {
+      const accounts = Object.values(data.accounts).flat();
+
+      const sel = document.getElementById('instAccount');
+      sel.innerHTML = '<option value="">Select account</option>';
+      accounts.forEach(a => { const o = document.createElement('option'); o.value = o.textContent = a; sel.appendChild(o); });
+
+      const adjSel = document.getElementById('adjAccount');
+      adjSel.innerHTML = '<option value="">Select account</option>';
+      accounts.forEach(a => { const o = document.createElement('option'); o.value = o.textContent = a; adjSel.appendChild(o); });
+
+      const catSel = document.getElementById('acctCategory');
+      catSel.innerHTML = '<option value="">Select category</option>';
+      (data.acctCats || []).forEach(c => { const o = document.createElement('option'); o.value = o.textContent = c; catSel.appendChild(o); });
+
+      const curSel = document.getElementById('acctCurrency');
+      curSel.innerHTML = '';
+      (data.currencies || ['PHP']).forEach(c => { const o = document.createElement('option'); o.value = o.textContent = c; curSel.appendChild(o); });
+    }).getAccountList();
+
+    document.getElementById('adjForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const btn = document.getElementById('adjSubmit');
+      const msg = document.getElementById('adjMsg');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      google.script.run
+        .withSuccessHandler(res => {
+          msg.style.color = res.success ? 'green' : 'red';
+          msg.textContent = res.success ? 'Balance adjusted!' : ('Error: ' + res.error);
+          if (res.success) document.getElementById('adjForm').reset();
+          btn.disabled = false; btn.textContent = 'Adjust';
+        })
+        .withFailureHandler(err => { msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message; btn.disabled = false; btn.textContent = 'Adjust'; })
+        .adjustBalance({ account: document.getElementById('adjAccount').value, target_balance: document.getElementById('adjBal').value });
+    });
+
+    document.getElementById('acctCategory').addEventListener('change', function() {
+      document.getElementById('ccFields').style.display = this.value === 'Credit Cards' ? 'block' : 'none';
+    });
+
+    document.getElementById('acctForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const btn = document.getElementById('acctSubmit');
+      const msg = document.getElementById('acctMsg');
+      btn.disabled = true; btn.textContent = 'Saving...';
+
+      const fileInput = document.getElementById('acctImage');
+      const file = fileInput.files[0];
+
+      const submit = (imageData) => {
+        google.script.run
+          .withSuccessHandler(res => {
+            msg.style.color = res.success ? 'green' : 'red';
+            msg.textContent = res.success ? 'Account added!' : ('Error: ' + res.error);
+            if (res.success) document.getElementById('acctForm').reset();
+            btn.disabled = false; btn.textContent = 'Add Account';
+          })
+          .withFailureHandler(err => {
+            msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message;
+            btn.disabled = false; btn.textContent = 'Add Account';
+          })
+          .addAccount({
+            name: document.getElementById('acctName').value,
+            category: document.getElementById('acctCategory').value,
+            init_balance: document.getElementById('acctInitBal').value,
+            currency: document.getElementById('acctCurrency').value,
+            metadata: document.getElementById('acctMeta').value,
+            credit_limit: document.getElementById('acctLimit').value,
+            image: imageData || null,
+            statement_day: document.getElementById('acctStmtDay').value,
+            due_day: document.getElementById('acctDueDay').value,
+          });
+      };
+
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => submit({ base64: reader.result.split(',')[1], mimeType: file.type, name: file.name });
+        reader.readAsDataURL(file);
+      } else {
+        submit(null);
+      }
+    });
+
+    document.getElementById('instStart').value = new Date().toISOString().slice(0, 10);
+
+    document.getElementById('instForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const btn = document.getElementById('instSubmit');
+      const msg = document.getElementById('instMsg');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      const [y, m, d] = document.getElementById('instStart').value.split('-');
+      google.script.run
+        .withSuccessHandler(res => {
+          msg.style.color = res.success ? 'green' : 'red';
+          msg.textContent = res.success ? 'Installment added!' : ('Error: ' + res.error);
+          if (res.success) document.getElementById('instForm').reset();
+          btn.disabled = false; btn.textContent = 'Add Installment';
+        })
+        .withFailureHandler(err => {
+          msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message;
+          btn.disabled = false; btn.textContent = 'Add Installment';
+        })
+        .addInstallment({
+          installment: document.getElementById('instName').value,
+          account: document.getElementById('instAccount').value,
+          total_amount: document.getElementById('instTotal').value,
+          terms: document.getElementById('instTerms').value,
+          start_date: `${m}/${d}/${y}`
+        });
+    });
+
+    document.getElementById('catForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const btn = document.getElementById('catSubmit');
+      const msg = document.getElementById('catMsg');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      google.script.run
+        .withSuccessHandler(res => {
+          msg.style.color = res.success ? 'green' : 'red';
+          msg.textContent = res.success ? 'Category added!' : ('Error: ' + res.error);
+          if (res.success) document.getElementById('catForm').reset();
+          btn.disabled = false; btn.textContent = 'Add Category';
+        })
+        .withFailureHandler(err => {
+          msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message;
+          btn.disabled = false; btn.textContent = 'Add Category';
+        })
+        .addCategory({
+          type: document.getElementById('catType').value,
+          category: document.getElementById('catName').value,
+          subcategory: document.getElementById('catSub').value
+        });
+    });
+  </script>
+</body>
+</html>
