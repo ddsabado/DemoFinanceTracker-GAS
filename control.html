@@ -4,19 +4,43 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Finance Control Center</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --surface2: #263348;
+      --border: #334155; --accent: #6366f1;
+      --text: #f1f5f9; --muted: #94a3b8; --success: #22c55e; --danger: #f43f5e;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: sans-serif; background: #f5f5f5; padding: 24px; }
-    h1 { font-size: 1.3rem; color: #333; margin-bottom: 24px; }
-    .cards { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
-    .card { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.1); flex: 1; min-width: 300px; max-width: 480px; }
-    h2 { font-size: 1rem; color: #555; margin-bottom: 16px; }
-    .field { margin-bottom: 14px; display: flex; flex-direction: column; gap: 4px; }
-    label { font-size: .8rem; color: #888; }
-    input, select { padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: .95rem; width: 100%; }
-    button[type=submit] { margin-top: 8px; width: 100%; padding: 10px; background: #4f8ef7; color: #fff; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
-    button[type=submit]:disabled { background: #aaa; cursor: not-allowed; }
-    .msg { margin-top: 12px; font-size: .85rem; text-align: center; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); padding: 24px; }
+    h1 { font-size: 1.1rem; font-weight: 700; color: var(--text); margin-bottom: 24px; letter-spacing: .02em; }
+    .cards { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+    .card { background: var(--surface); border-radius: 12px; padding: 20px; border: 1px solid var(--border); border-left: 3px solid var(--accent); flex: 1; min-width: 300px; max-width: 480px; }
+    h2 { font-size: .72rem; font-weight: 600; color: var(--muted); margin-bottom: 16px; text-transform: uppercase; letter-spacing: .08em; }
+    .field { margin-bottom: 12px; display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: .75rem; font-weight: 500; color: var(--muted); }
+    input, select {
+      padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+      font-size: .88rem; width: 100%; background: var(--surface2); color: var(--text);
+      font-family: inherit; transition: border-color .15s;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    input[type=file] { padding: 6px 10px; font-size: .8rem; color: var(--muted); cursor: pointer; }
+    input[type=file]::file-selector-button {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--muted); padding: 4px 10px; font-size: .78rem; cursor: pointer; margin-right: 8px;
+    }
+    select option { background: var(--surface2); }
+    button[type=submit] {
+      margin-top: 6px; width: 100%; padding: 10px; background: var(--accent);
+      color: #fff; border: none; border-radius: 8px; font-size: .9rem;
+      font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity .15s;
+    }
+    button[type=submit]:hover { opacity: .85; }
+    button[type=submit]:disabled { opacity: .45; cursor: not-allowed; }
+    .msg { margin-top: 10px; font-size: .8rem; text-align: center; padding: 6px 12px; border-radius: 6px; display: none; }
+    .msg.ok { display: block; background: rgba(34,197,94,.12); color: var(--success); border: 1px solid rgba(34,197,94,.25); }
+    .msg.err { display: block; background: rgba(244,63,94,.12); color: var(--danger); border: 1px solid rgba(244,63,94,.25); }
   </style>
 </head>
 <body>
@@ -166,12 +190,12 @@
       btn.disabled = true; btn.textContent = 'Saving...';
       google.script.run
         .withSuccessHandler(res => {
-          msg.style.color = res.success ? 'green' : 'red';
+          msg.className = 'msg ' + (res.success ? 'ok' : 'err');
           msg.textContent = res.success ? 'Balance adjusted!' : ('Error: ' + res.error);
           if (res.success) document.getElementById('adjForm').reset();
           btn.disabled = false; btn.textContent = 'Adjust';
         })
-        .withFailureHandler(err => { msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message; btn.disabled = false; btn.textContent = 'Adjust'; })
+        .withFailureHandler(err => { msg.className = 'msg err'; msg.textContent = 'Error: ' + err.message; btn.disabled = false; btn.textContent = 'Adjust'; })
         .adjustBalance({ account: document.getElementById('adjAccount').value, target_balance: document.getElementById('adjBal').value });
     });
 
@@ -191,13 +215,13 @@
       const submit = (imageData) => {
         google.script.run
           .withSuccessHandler(res => {
-            msg.style.color = res.success ? 'green' : 'red';
+            msg.className = 'msg ' + (res.success ? 'ok' : 'err');
             msg.textContent = res.success ? 'Account added!' : ('Error: ' + res.error);
             if (res.success) document.getElementById('acctForm').reset();
             btn.disabled = false; btn.textContent = 'Add Account';
           })
           .withFailureHandler(err => {
-            msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message;
+            msg.className = 'msg err'; msg.textContent = 'Error: ' + err.message;
             btn.disabled = false; btn.textContent = 'Add Account';
           })
           .addAccount({
@@ -232,13 +256,13 @@
       const [y, m, d] = document.getElementById('instStart').value.split('-');
       google.script.run
         .withSuccessHandler(res => {
-          msg.style.color = res.success ? 'green' : 'red';
+          msg.className = 'msg ' + (res.success ? 'ok' : 'err');
           msg.textContent = res.success ? 'Installment added!' : ('Error: ' + res.error);
           if (res.success) document.getElementById('instForm').reset();
           btn.disabled = false; btn.textContent = 'Add Installment';
         })
         .withFailureHandler(err => {
-          msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message;
+          msg.className = 'msg err'; msg.textContent = 'Error: ' + err.message;
           btn.disabled = false; btn.textContent = 'Add Installment';
         })
         .addInstallment({
@@ -257,13 +281,13 @@
       btn.disabled = true; btn.textContent = 'Saving...';
       google.script.run
         .withSuccessHandler(res => {
-          msg.style.color = res.success ? 'green' : 'red';
+          msg.className = 'msg ' + (res.success ? 'ok' : 'err');
           msg.textContent = res.success ? 'Category added!' : ('Error: ' + res.error);
           if (res.success) document.getElementById('catForm').reset();
           btn.disabled = false; btn.textContent = 'Add Category';
         })
         .withFailureHandler(err => {
-          msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message;
+          msg.className = 'msg err'; msg.textContent = 'Error: ' + err.message;
           btn.disabled = false; btn.textContent = 'Add Category';
         })
         .addCategory({
