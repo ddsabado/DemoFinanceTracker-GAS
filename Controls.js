@@ -1,3 +1,43 @@
+function getControlData() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const acctRows = ss.getSheetByName('Accounts').getDataRange().getValues().slice(1);
+  const accounts = {};
+  acctRows.forEach(([account, category]) => {
+    if (!account || !category) return;
+    if (!accounts[category]) accounts[category] = [];
+    accounts[category].push(account);
+  });
+  const acctCats = ss.getSheetByName('Account Categories').getDataRange().getValues().slice(1).map(r => r[0]).filter(Boolean);
+  const currencies = ss.getSheetByName('Currency').getDataRange().getValues().slice(1).map(r => r[0]).filter(Boolean);
+  const txnTypes = ss.getSheetByName('Txn_Type').getDataRange().getValues().slice(1).map(r => r[0]).filter(Boolean);
+  const categories = ss.getSheetByName('Txn_Categories').getDataRange().getValues().slice(1).map(r => r[0]).filter(Boolean);
+  const subcatMap = {};
+  ss.getSheetByName('Txn_Subcategories').getDataRange().getValues().slice(1).forEach(([sub, cat]) => {
+    if (!sub || !cat) return;
+    if (!subcatMap[cat]) subcatMap[cat] = [];
+    subcatMap[cat].push(sub);
+  });
+  return { accounts, acctCats, currencies, txnTypes, categories, subcatMap };
+}
+
+function addTransaction(body) {
+  try {
+    const { date, account, amount, currency, target_account, type, category, subcategory, note } = body;
+    const [month, day, year] = date.split('/');
+    const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('2026 Transactions');
+    sheet.appendRow([
+      Utilities.formatDate(dateObj, Session.getScriptTimeZone(), 'MM/dd/yyyy'),
+      account || '', Number(amount) || '', currency || 'PHP',
+      target_account || '', type || '', category || '', subcategory || '', note || ''
+    ]);
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).sort({column: 1, ascending: true});
+    return { success: true };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}
+
 function getAccountList() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const acctRows = ss.getSheetByName('Accounts').getDataRange().getValues().slice(1);

@@ -48,6 +48,50 @@
   <div class="cards">
 
   <div class="card">
+    <h2>Add Transaction</h2>
+    <form id="txForm">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="txDate" required>
+      </div>
+      <div class="field">
+        <label>Account</label>
+        <select id="txAccount" required><option value="">Loading...</option></select>
+      </div>
+      <div class="field">
+        <label>Amount</label>
+        <input type="number" id="txAmount" required step="0.01">
+      </div>
+      <div class="field">
+        <label>Currency</label>
+        <select id="txCurrency" required></select>
+      </div>
+      <div class="field">
+        <label>Type</label>
+        <select id="txType" required><option value="">Select type</option></select>
+      </div>
+      <div class="field">
+        <label>Target Account (optional)</label>
+        <select id="txTarget"><option value="">None</option></select>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select id="txCategory"><option value="">Select category</option></select>
+      </div>
+      <div class="field">
+        <label>Subcategory (optional)</label>
+        <select id="txSubcategory"><option value="">None</option></select>
+      </div>
+      <div class="field">
+        <label>Note (optional)</label>
+        <input type="text" id="txNote" placeholder="e.g. Grab ride to BGC">
+      </div>
+      <button type="submit" id="txSubmit">Add Transaction</button>
+      <div class="msg" id="txMsg"></div>
+    </form>
+  </div>
+
+  <div class="card">
     <h2>Adjust Balance</h2>
     <form id="adjForm">
       <div class="field">
@@ -166,13 +210,22 @@
     google.script.run.withSuccessHandler(data => {
       const accounts = Object.values(data.accounts).flat();
 
-      const sel = document.getElementById('instAccount');
-      sel.innerHTML = '<option value="">Select account</option>';
-      accounts.forEach(a => { const o = document.createElement('option'); o.value = o.textContent = a; sel.appendChild(o); });
+      ['txAccount', 'txTarget', 'instAccount', 'adjAccount'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        sel.innerHTML = id === 'txTarget' ? '<option value="">None</option>' : '<option value="">Select account</option>';
+        accounts.forEach(a => { const o = document.createElement('option'); o.value = o.textContent = a; sel.appendChild(o); });
+      });
 
-      const adjSel = document.getElementById('adjAccount');
-      adjSel.innerHTML = '<option value="">Select account</option>';
-      accounts.forEach(a => { const o = document.createElement('option'); o.value = o.textContent = a; adjSel.appendChild(o); });
+      const txTypeSel = document.getElementById('txType');
+      (data.txnTypes || []).forEach(t => { const o = document.createElement('option'); o.value = o.textContent = t; txTypeSel.appendChild(o); });
+
+      const txCatSel = document.getElementById('txCategory');
+      (data.categories || []).forEach(c => { const o = document.createElement('option'); o.value = o.textContent = c; txCatSel.appendChild(o); });
+
+      const txCurSel = document.getElementById('txCurrency');
+      txCurSel.innerHTML = '';
+      (data.currencies || ['PHP']).forEach(c => { const o = document.createElement('option'); o.value = o.textContent = c; txCurSel.appendChild(o); });
 
       const catSel = document.getElementById('acctCategory');
       catSel.innerHTML = '<option value="">Select category</option>';
@@ -181,7 +234,44 @@
       const curSel = document.getElementById('acctCurrency');
       curSel.innerHTML = '';
       (data.currencies || ['PHP']).forEach(c => { const o = document.createElement('option'); o.value = o.textContent = c; curSel.appendChild(o); });
-    }).getAccountList();
+
+      // subcategory map
+      window._subcatMap = data.subcatMap || {};
+    }).getControlData();
+
+    document.getElementById('txCategory').addEventListener('change', function() {
+      const subSel = document.getElementById('txSubcategory');
+      const subs = (window._subcatMap || {})[this.value] || [];
+      subSel.innerHTML = '<option value="">None</option>';
+      subs.forEach(s => { const o = document.createElement('option'); o.value = o.textContent = s; subSel.appendChild(o); });
+    });
+
+    document.getElementById('txForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const btn = document.getElementById('txSubmit');
+      const msg = document.getElementById('txMsg');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      const [y, m, d] = document.getElementById('txDate').value.split('-');
+      google.script.run
+        .withSuccessHandler(res => {
+          msg.style.color = res.success ? 'green' : 'red';
+          msg.textContent = res.success ? 'Transaction added!' : ('Error: ' + res.error);
+          if (res.success) document.getElementById('txForm').reset();
+          btn.disabled = false; btn.textContent = 'Add Transaction';
+        })
+        .withFailureHandler(err => { msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message; btn.disabled = false; btn.textContent = 'Add Transaction'; })
+        .addTransaction({
+          date: `${m}/${d}/${y}`,
+          account: document.getElementById('txAccount').value,
+          amount: document.getElementById('txAmount').value,
+          currency: document.getElementById('txCurrency').value,
+          target_account: document.getElementById('txTarget').value,
+          type: document.getElementById('txType').value,
+          category: document.getElementById('txCategory').value,
+          subcategory: document.getElementById('txSubcategory').value,
+          note: document.getElementById('txNote').value,
+        });
+    });
 
     document.getElementById('adjForm').addEventListener('submit', e => {
       e.preventDefault();
