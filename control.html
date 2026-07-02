@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Finance Control Center</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     :root {
       --bg: #0f172a; --surface: #1e293b; --surface2: #263348;
@@ -14,9 +15,69 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); padding: 24px; }
     h1 { font-size: 1.1rem; font-weight: 700; color: var(--text); margin-bottom: 24px; letter-spacing: .02em; }
-    .cards { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
-    .card { background: var(--surface); border-radius: 12px; padding: 20px; border: 1px solid var(--border); border-left: 3px solid var(--accent); flex: 1; min-width: 300px; max-width: 480px; }
-    h2 { font-size: .72rem; font-weight: 600; color: var(--muted); margin-bottom: 16px; text-transform: uppercase; letter-spacing: .08em; }
+
+    /* Tile grid */
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px; }
+    .tile {
+      aspect-ratio: 1;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+      padding: 16px; transition: background .15s, border-color .15s, transform .1s;
+      user-select: none;
+    }
+    .tile:hover { background: var(--surface2); border-color: var(--accent); transform: translateY(-2px); }
+    .tile:active { transform: scale(.97); }
+    .tile-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
+    }
+    .tile-label { font-size: .72rem; font-weight: 600; color: var(--muted); text-align: center; text-transform: uppercase; letter-spacing: .06em; line-height: 1.3; }
+    .tile:hover .tile-label { color: var(--text); }
+
+    .tile-icon svg { width: 22px; height: 22px; }
+    .tile-add-tx   .tile-icon { background: rgba(99,102,241,.15); color: #818cf8; }
+    .tile-adj-bal  .tile-icon { background: rgba(34,197,94,.15);  color: #4ade80; }
+    .tile-add-inst .tile-icon { background: rgba(251,191,36,.15); color: #fbbf24; }
+    .tile-add-acct .tile-icon { background: rgba(56,189,248,.15); color: #38bdf8; }
+    .tile-add-cat  .tile-icon { background: rgba(244,63,94,.15);  color: #fb7185; }
+
+    /* Modal backdrop */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+      z-index: 100; align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-backdrop.open { display: flex; }
+
+    /* Modal box */
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; width: 100%; max-width: 440px;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 24px 48px rgba(0,0,0,.5);
+      animation: modal-in .18s ease;
+    }
+    @keyframes modal-in { from { opacity: 0; transform: scale(.96) translateY(8px); } to { opacity: 1; transform: none; } }
+
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 20px 0;
+    }
+    .modal-title { font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    .modal-close {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--muted); cursor: pointer; width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s, color .15s;
+    }
+    .modal-close svg { width: 14px; height: 14px; }
+    .modal-close:hover { background: var(--border); color: var(--text); }
+
+    .modal-body { padding: 16px 20px 20px; }
+
+    /* Form styles */
     .field { margin-bottom: 12px; display: flex; flex-direction: column; gap: 5px; }
     label { font-size: .75rem; font-weight: 500; color: var(--muted); }
     input, select {
@@ -45,167 +106,165 @@
 </head>
 <body>
   <h1>Control Center</h1>
-  <div class="cards">
 
-  <div class="card">
-    <h2>Add Transaction</h2>
-    <form id="txForm">
-      <div class="field">
-        <label>Date</label>
-        <input type="date" id="txDate" required>
-      </div>
-      <div class="field">
-        <label>Account</label>
-        <select id="txAccount" required><option value="">Loading...</option></select>
-      </div>
-      <div class="field">
-        <label>Amount</label>
-        <input type="number" id="txAmount" required step="0.01">
-      </div>
-      <div class="field">
-        <label>Currency</label>
-        <select id="txCurrency" required></select>
-      </div>
-      <div class="field">
-        <label>Type</label>
-        <select id="txType" required><option value="">Select type</option></select>
-      </div>
-      <div class="field">
-        <label>Target Account (optional)</label>
-        <select id="txTarget"><option value="">None</option></select>
-      </div>
-      <div class="field">
-        <label>Category</label>
-        <select id="txCategory"><option value="">Select category</option></select>
-      </div>
-      <div class="field">
-        <label>Subcategory (optional)</label>
-        <select id="txSubcategory"><option value="">None</option></select>
-      </div>
-      <div class="field">
-        <label>Note (optional)</label>
-        <input type="text" id="txNote" placeholder="e.g. Grab ride to BGC">
-      </div>
-      <button type="submit" id="txSubmit">Add Transaction</button>
-      <div class="msg" id="txMsg"></div>
-    </form>
+  <!-- Tile grid -->
+  <div class="tiles">
+    <div class="tile tile-add-tx"   onclick="openModal('modalTx')">
+      <div class="tile-icon"><i data-lucide="plus-circle"></i></div>
+      <div class="tile-label">Add Transaction</div>
+    </div>
+    <div class="tile tile-adj-bal"  onclick="openModal('modalAdj')">
+      <div class="tile-icon"><i data-lucide="scale"></i></div>
+      <div class="tile-label">Adjust Balance</div>
+    </div>
+    <div class="tile tile-add-inst" onclick="openModal('modalInst')">
+      <div class="tile-icon"><i data-lucide="calendar-plus"></i></div>
+      <div class="tile-label">Add Installment</div>
+    </div>
+    <div class="tile tile-add-acct" onclick="openModal('modalAcct')">
+      <div class="tile-icon"><i data-lucide="landmark"></i></div>
+      <div class="tile-label">Add Account</div>
+    </div>
+    <div class="tile tile-add-cat"  onclick="openModal('modalCat')">
+      <div class="tile-icon"><i data-lucide="tag"></i></div>
+      <div class="tile-label">New Category</div>
+    </div>
   </div>
 
-  <div class="card">
-    <h2>Adjust Balance</h2>
-    <form id="adjForm">
-      <div class="field">
-        <label>Account</label>
-        <select id="adjAccount" required><option value="">Loading...</option></select>
+  <!-- Modal: Add Transaction -->
+  <div class="modal-backdrop" id="modalTx">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Add Transaction</div>
+        <button class="modal-close" onclick="closeModal('modalTx')"><i data-lucide="x"></i></button>
       </div>
-      <div class="field">
-        <label>New Balance</label>
-        <input type="number" id="adjBal" required step="0.01">
+      <div class="modal-body">
+        <form id="txForm">
+          <div class="field"><label>Date</label><input type="date" id="txDate" required></div>
+          <div class="field"><label>Account</label><select id="txAccount" required><option value="">Loading...</option></select></div>
+          <div class="field"><label>Amount</label><input type="number" id="txAmount" required step="0.01"></div>
+          <div class="field"><label>Currency</label><select id="txCurrency" required></select></div>
+          <div class="field"><label>Type</label><select id="txType" required><option value="">Select type</option></select></div>
+          <div class="field"><label>Target Account (optional)</label><select id="txTarget"><option value="">None</option></select></div>
+          <div class="field"><label>Category</label><select id="txCategory"><option value="">Select category</option></select></div>
+          <div class="field"><label>Subcategory (optional)</label><select id="txSubcategory"><option value="">None</option></select></div>
+          <div class="field"><label>Note (optional)</label><input type="text" id="txNote" placeholder="e.g. Grab ride to BGC"></div>
+          <button type="submit" id="txSubmit">Add Transaction</button>
+          <div class="msg" id="txMsg"></div>
+        </form>
       </div>
-      <button type="submit" id="adjSubmit">Adjust</button>
-      <div class="msg" id="adjMsg"></div>
-    </form>
+    </div>
   </div>
 
-  <div class="card">
-    <h2>Add Installment</h2>
-    <form id="instForm">
-      <div class="field">
-        <label>Installment Name</label>
-        <input type="text" id="instName" required placeholder="e.g. iPhone 16 Pro">
+  <!-- Modal: Adjust Balance -->
+  <div class="modal-backdrop" id="modalAdj">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Adjust Balance</div>
+        <button class="modal-close" onclick="closeModal('modalAdj')"><i data-lucide="x"></i></button>
       </div>
-      <div class="field">
-        <label>Account</label>
-        <select id="instAccount" required><option value="">Loading...</option></select>
+      <div class="modal-body">
+        <form id="adjForm">
+          <div class="field"><label>Account</label><select id="adjAccount" required><option value="">Loading...</option></select></div>
+          <div class="field"><label>New Balance</label><input type="number" id="adjBal" required step="0.01"></div>
+          <button type="submit" id="adjSubmit">Adjust</button>
+          <div class="msg" id="adjMsg"></div>
+        </form>
       </div>
-      <div class="field">
-        <label>Total Amount (PHP)</label>
-        <input type="number" id="instTotal" required min="0" step="0.01">
-      </div>
-      <div class="field">
-        <label>Terms (months)</label>
-        <input type="number" id="instTerms" required min="1" step="1">
-      </div>
-      <div class="field">
-        <label>Start Date</label>
-        <input type="date" id="instStart" required>
-      </div>
-      <button type="submit" id="instSubmit">Add Installment</button>
-      <div class="msg" id="instMsg"></div>
-    </form>
+    </div>
   </div>
 
-  <div class="card">
-    <h2>Add Account</h2>
-    <form id="acctForm">
-      <div class="field">
-        <label>Account Name</label>
-        <input type="text" id="acctName" required placeholder="e.g. BPI Savings">
+  <!-- Modal: Add Installment -->
+  <div class="modal-backdrop" id="modalInst">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Add Installment</div>
+        <button class="modal-close" onclick="closeModal('modalInst')"><i data-lucide="x"></i></button>
       </div>
-      <div class="field">
-        <label>Account Category</label>
-        <select id="acctCategory" required><option value="">Loading...</option></select>
+      <div class="modal-body">
+        <form id="instForm">
+          <div class="field"><label>Installment Name</label><input type="text" id="instName" required placeholder="e.g. iPhone 16 Pro"></div>
+          <div class="field"><label>Account</label><select id="instAccount" required><option value="">Loading...</option></select></div>
+          <div class="field"><label>Total Amount (PHP)</label><input type="number" id="instTotal" required min="0" step="0.01"></div>
+          <div class="field"><label>Terms (months)</label><input type="number" id="instTerms" required min="1" step="1"></div>
+          <div class="field"><label>Start Date</label><input type="date" id="instStart" required></div>
+          <button type="submit" id="instSubmit">Add Installment</button>
+          <div class="msg" id="instMsg"></div>
+        </form>
       </div>
-      <div class="field">
-        <label>Initial Balance</label>
-        <input type="number" id="acctInitBal" required step="0.01" placeholder="0">
-      </div>
-      <div class="field">
-        <label>Currency</label>
-        <select id="acctCurrency" required><option value="">Loading...</option></select>
-      </div>
-      <div class="field">
-        <label>Metadata (optional)</label>
-        <input type="text" id="acctMeta" placeholder="e.g. last 4 digits">
-      </div>
-      <div id="ccFields" style="display:none">
-        <div class="field">
-          <label>Credit Limit</label>
-          <input type="number" id="acctLimit" step="0.01">
-        </div>
-        <div class="field">
-          <label>Card Image (optional)</label>
-          <input type="file" id="acctImage" accept="image/*">
-        </div>
-        <div class="field">
-          <label>Statement Day</label>
-          <input type="number" id="acctStmtDay" min="1" max="31">
-        </div>
-        <div class="field">
-          <label>Due Day</label>
-          <input type="number" id="acctDueDay" min="1" max="31">
-        </div>
-      </div>
-      <button type="submit" id="acctSubmit">Add Account</button>
-      <div class="msg" id="acctMsg"></div>
-    </form>
+    </div>
   </div>
 
-  <div class="card">
-    <h2>New Category</h2>
-    <form id="catForm">
-      <div class="field">
-        <label>Type</label>
-        <select id="catType" required>
-          <option value="Expense">Expense</option>
-          <option value="Income">Income</option>
-        </select>
+  <!-- Modal: Add Account -->
+  <div class="modal-backdrop" id="modalAcct">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Add Account</div>
+        <button class="modal-close" onclick="closeModal('modalAcct')"><i data-lucide="x"></i></button>
       </div>
-      <div class="field">
-        <label>Category Name</label>
-        <input type="text" id="catName" required placeholder="e.g. Food">
+      <div class="modal-body">
+        <form id="acctForm">
+          <div class="field"><label>Account Name</label><input type="text" id="acctName" required placeholder="e.g. BPI Savings"></div>
+          <div class="field"><label>Account Category</label><select id="acctCategory" required><option value="">Loading...</option></select></div>
+          <div class="field"><label>Initial Balance</label><input type="number" id="acctInitBal" required step="0.01" placeholder="0"></div>
+          <div class="field"><label>Currency</label><select id="acctCurrency" required><option value="">Loading...</option></select></div>
+          <div class="field"><label>Metadata (optional)</label><input type="text" id="acctMeta" placeholder="e.g. last 4 digits"></div>
+          <div id="ccFields" style="display:none">
+            <div class="field"><label>Credit Limit</label><input type="number" id="acctLimit" step="0.01"></div>
+            <div class="field"><label>Card Image (optional)</label><input type="file" id="acctImage" accept="image/*"></div>
+            <div class="field"><label>Statement Day</label><input type="number" id="acctStmtDay" min="1" max="31"></div>
+            <div class="field"><label>Due Day</label><input type="number" id="acctDueDay" min="1" max="31"></div>
+          </div>
+          <button type="submit" id="acctSubmit">Add Account</button>
+          <div class="msg" id="acctMsg"></div>
+        </form>
       </div>
-      <div class="field">
-        <label>Subcategory (optional)</label>
-        <input type="text" id="catSub" placeholder="e.g. Groceries">
-      </div>
-      <button type="submit" id="catSubmit">Add Category</button>
-      <div class="msg" id="catMsg"></div>
-    </form>
+    </div>
   </div>
 
-  </div><!-- /cards -->
+  <!-- Modal: New Category -->
+  <div class="modal-backdrop" id="modalCat">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">New Category</div>
+        <button class="modal-close" onclick="closeModal('modalCat')"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="catForm">
+          <div class="field">
+            <label>Type</label>
+            <select id="catType" required>
+              <option value="Expense">Expense</option>
+              <option value="Income">Income</option>
+            </select>
+          </div>
+          <div class="field"><label>Category Name</label><input type="text" id="catName" required placeholder="e.g. Food"></div>
+          <div class="field"><label>Subcategory (optional)</label><input type="text" id="catSub" placeholder="e.g. Groceries"></div>
+          <button type="submit" id="catSubmit">Add Category</button>
+          <div class="msg" id="catMsg"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <script>
+    function openModal(id) {
+      document.getElementById(id).classList.add('open');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+    }
+    // Close on backdrop click
+    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+      backdrop.addEventListener('click', e => {
+        if (e.target === backdrop) backdrop.classList.remove('open');
+      });
+    });
+    // Close on Escape
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') document.querySelectorAll('.modal-backdrop.open').forEach(m => m.classList.remove('open'));
+    });
+
     // Populate dropdowns
     google.script.run.withSuccessHandler(data => {
       const accounts = Object.values(data.accounts).flat();
@@ -235,7 +294,6 @@
       curSel.innerHTML = '';
       (data.currencies || ['PHP']).forEach(c => { const o = document.createElement('option'); o.value = o.textContent = c; curSel.appendChild(o); });
 
-      // subcategory map
       window._subcatMap = data.subcatMap || {};
     }).getControlData();
 
@@ -254,12 +312,12 @@
       const [y, m, d] = document.getElementById('txDate').value.split('-');
       google.script.run
         .withSuccessHandler(res => {
-          msg.style.color = res.success ? 'green' : 'red';
+          msg.className = 'msg ' + (res.success ? 'ok' : 'err');
           msg.textContent = res.success ? 'Transaction added!' : ('Error: ' + res.error);
           if (res.success) document.getElementById('txForm').reset();
           btn.disabled = false; btn.textContent = 'Add Transaction';
         })
-        .withFailureHandler(err => { msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message; btn.disabled = false; btn.textContent = 'Add Transaction'; })
+        .withFailureHandler(err => { msg.className = 'msg err'; msg.textContent = 'Error: ' + err.message; btn.disabled = false; btn.textContent = 'Add Transaction'; })
         .addTransaction({
           date: `${m}/${d}/${y}`,
           account: document.getElementById('txAccount').value,
@@ -298,10 +356,8 @@
       const btn = document.getElementById('acctSubmit');
       const msg = document.getElementById('acctMsg');
       btn.disabled = true; btn.textContent = 'Saving...';
-
       const fileInput = document.getElementById('acctImage');
       const file = fileInput.files[0];
-
       const submit = (imageData) => {
         google.script.run
           .withSuccessHandler(res => {
@@ -310,10 +366,7 @@
             if (res.success) document.getElementById('acctForm').reset();
             btn.disabled = false; btn.textContent = 'Add Account';
           })
-          .withFailureHandler(err => {
-            msg.className = 'msg err'; msg.textContent = 'Error: ' + err.message;
-            btn.disabled = false; btn.textContent = 'Add Account';
-          })
+          .withFailureHandler(err => { msg.className = 'msg err'; msg.textContent = 'Error: ' + err.message; btn.disabled = false; btn.textContent = 'Add Account'; })
           .addAccount({
             name: document.getElementById('acctName').value,
             category: document.getElementById('acctCategory').value,
@@ -326,7 +379,6 @@
             due_day: document.getElementById('acctDueDay').value,
           });
       };
-
       if (file) {
         const reader = new FileReader();
         reader.onload = () => submit({ base64: reader.result.split(',')[1], mimeType: file.type, name: file.name });
@@ -337,6 +389,7 @@
     });
 
     document.getElementById('instStart').value = new Date().toISOString().slice(0, 10);
+    lucide.createIcons();
 
     document.getElementById('instForm').addEventListener('submit', e => {
       e.preventDefault();
@@ -351,10 +404,7 @@
           if (res.success) document.getElementById('instForm').reset();
           btn.disabled = false; btn.textContent = 'Add Installment';
         })
-        .withFailureHandler(err => {
-          msg.className = 'msg err'; msg.textContent = 'Error: ' + err.message;
-          btn.disabled = false; btn.textContent = 'Add Installment';
-        })
+        .withFailureHandler(err => { msg.className = 'msg err'; msg.textContent = 'Error: ' + err.message; btn.disabled = false; btn.textContent = 'Add Installment'; })
         .addInstallment({
           installment: document.getElementById('instName').value,
           account: document.getElementById('instAccount').value,
@@ -376,10 +426,7 @@
           if (res.success) document.getElementById('catForm').reset();
           btn.disabled = false; btn.textContent = 'Add Category';
         })
-        .withFailureHandler(err => {
-          msg.className = 'msg err'; msg.textContent = 'Error: ' + err.message;
-          btn.disabled = false; btn.textContent = 'Add Category';
-        })
+        .withFailureHandler(err => { msg.className = 'msg err'; msg.textContent = 'Error: ' + err.message; btn.disabled = false; btn.textContent = 'Add Category'; })
         .addCategory({
           type: document.getElementById('catType').value,
           category: document.getElementById('catName').value,
